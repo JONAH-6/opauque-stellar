@@ -1,0 +1,77 @@
+{
+  "schemaVersion": "1.0.0",
+  "release": "v1",
+  "network": "testnet",
+  "networkPassphrase": "Test SDF Network ; September 2015",
+  "rpcUrl": "https://soroban-testnet.stellar.org",
+  "horizonUrl": "https://horizon-testnet.stellar.org",
+  "deploymentLedger": null,
+  "deployedAt": null,
+  "deployer": null,
+  "admin": null,
+  "multisig": null,
+  "deploymentStatus": "template",
+  "contracts": {
+    "stealthRegistry": {
+      "id": "",
+      "wasmHash": "",
+      "package": "stealth-registry"
+    },
+    "stealthAnnouncer": {
+      "id": "",
+      "wasmHash": "",
+      "package": "stealth-announcer"
+    },
+    "groth16Verifier": {
+      "id": "",
+      "wasmHash": "",
+      "package": "groth16-verifier"
+    },
+    "reputationVerifier": {
+      "id": "",
+      "wasmHash": "",
+      "package": "reputation-verifier"
+    },
+    "schemaRegistry": {
+      "id": "",
+      "wasmHash": "",
+      "package": "schema-registry"
+    },
+    "attestationEngineV2": {
+      "id": "",
+      "wasmHash": "",
+      "package": "attestation-engine-v2"
+    }
+  },
+  "artifacts": {
+    "frontend": {
+      "buildCommit": null,
+      "repository": "https://github.com/collinsadi/opaque"
+    },
+    "circuits": {
+      "v2": {
+        "r1csHash": "c67a500de9f45d87e59eac1b239d76768866c5dc0a1e6bee5adaf258d09c0504",
+        "verificationKeyHash": "24d0fe6a5ef1174ab616a5d39df846442af7a7818962b0ed346586bb1eb74b47",
+        "witnessWasmHash": "0fdc435cc602b4ab0c2e5fa41533901f876a158657f41183022d93eb76297a05",
+        "zkeyHash": "5a4545c179818742dbbd8efd73f9dbfd8b8f0427145c07c1bf37fff44a350897",
+        "contractVkHash": "8cd3043dcd8b97b11828cda7fbdf8e919c7d727fe05e7f62a20110bcb2dcfce6",
+        "zkeyHashBinding": "5a4545c179818742dbbd8efd73f9dbfd8b8f0427145c07c1bf37fff44a350897"
+      },
+      "v1": {
+        "witnessWasmHash": "48308a1097217d50bebe859d1cdab52da51dcc8ba2aa959eb7198f9a734d8913",
+        "zkeyHash": "4fc1d57377b43435853a70dcca374dc9f878e49a410adf53b479ed5edee78a42",
+        "r1csHash": "78bbd68d36438fc90008366200a36963e81af1c399bca46a2dd55759aac628ba",
+        "verificationKeyHash": "092573ee3ee637d4a0ccf337cb67109ee7ec4536d19668921b8018667940bf4d",
+        "contractVkHash": "db96564b4e1668bbd8455f4d0f4ecb5544b8358e19449380e44307b78b70b4d7",
+        "zkeyHashBinding": "4fc1d57377b43435853a70dcca374dc9f878e49a410adf53b479ed5edee78a42"
+      }
+    },
+    "scanner": {
+      "wasmHash": "31840c413d0440937c5e56ecbb4cb8695bbc4c198d6418c26e99a3dda2a44620"
+    }
+  },
+  "verification": {
+    "command": "stellar contract build && node scripts/verify-deployment-manifest.mjs --network testnet --check-wasm",
+    "output": null
+  }
+}
