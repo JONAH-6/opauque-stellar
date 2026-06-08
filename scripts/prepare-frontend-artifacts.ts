@@ -5,11 +5,22 @@
  */
 
 import { spawnSync } from "node:child_process";
-import { dirname, resolve } from "node:path";
+import { existsSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, "..");
+
+function resolveTsx() {
+  const local = join(ROOT, "node_modules", ".bin", "tsx");
+  if (existsSync(local)) return local;
+  const frontend = join(ROOT, "frontend", "node_modules", ".bin", "tsx");
+  if (existsSync(frontend)) return frontend;
+  return "tsx";
+}
+
+const TSX = resolveTsx();
 
 if (process.env.SKIP_FRONTEND_PREBUILD === "1") {
   console.log("SKIP_FRONTEND_PREBUILD=1 — skipping prepare-frontend-artifacts");
@@ -29,10 +40,10 @@ function run(label, cmd, args, opts = {}) {
   }
 }
 
-run("Build scanner WASM", "node", ["scripts/build-scanner-wasm.ts"]);
+run("Build scanner WASM", TSX, ["scripts/build-scanner-wasm.ts"]);
 
 // Best-effort fetch; build continues when release assets are not published yet.
-const fetchResult = spawnSync("node", ["scripts/fetch-circuit-artifacts.ts"], {
+const fetchResult = spawnSync(TSX, ["scripts/fetch-circuit-artifacts.ts"], {
   cwd: ROOT,
   stdio: "inherit",
   env: process.env,
@@ -41,14 +52,14 @@ if (fetchResult.status !== 0) {
   console.warn("Circuit artifact fetch skipped or incomplete (build locally or publish release assets).");
 }
 
-run("Verify pinned artifact hashes", "node", [
+run("Verify pinned artifact hashes", TSX, [
   "scripts/verify-artifact-manifest.ts",
   "--scanner",
   "--strict",
 ]);
 
 // Fail build when circuit files are present but hashes drift from manifest.
-run("Verify circuit artifacts when present", "node", [
+run("Verify circuit artifacts when present", TSX, [
   "scripts/verify-artifact-manifest.ts",
   "--circuits",
   "--vk-binding",
