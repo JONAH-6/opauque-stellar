@@ -14,7 +14,7 @@
 
 <br/>
 
-[**Launch the wallet →**](frontend/) · [**GitHub**](https://github.com/collinsadi/opaque-stellar) · [**Solana sibling**](https://github.com/collinsadi/opaque-solana)
+[**Launch the wallet →**](frontend/) · [**GitHub**](https://github.com/opaquecash/stellar-v1) · [**Solana sibling**](https://github.com/collinsadi/opaque-solana)
 
 <br/>
 
@@ -53,8 +53,8 @@
 Rust · [Stellar CLI](https://developers.stellar.org/docs/build/smart-contracts/getting-started/setup) · Node 20+ · [Freighter](https://freighter.app) · [wasm-pack](https://rustwasm.github.io/wasm-pack/installer/)
 
 ```bash
-git clone https://github.com/collinsadi/opaque-stellar.git
-cd opaque-stellar
+git clone https://github.com/opaquecash/stellar-v1.git
+cd stellar-v1
 ```
 
 ### 1 · Frontend wallet (fastest path)
@@ -189,7 +189,7 @@ Same DKSAP layout as [EIP-5564](https://eips.ethereum.org/EIPS/eip-5564) / [ERC-
 
 | Repo | Chain |
 |:-----|:------|
-| **opaque-stellar** (this) | Stellar / Soroban |
+| [**stellar-v1**](https://github.com/opaquecash/stellar-v1) (this) | Stellar / Soroban |
 | [opaque-solana](https://github.com/collinsadi/opaque-solana) | Solana |
 
 ---

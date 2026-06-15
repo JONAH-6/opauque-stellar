@@ -4,19 +4,19 @@
 
 **Please do not** open public GitHub issues for security vulnerabilities.
 
-Report them through a **[private GitHub security advisory](https://github.com/collinsadi/opaque/security/advisories/new)** on this repository.
+Report them through a **[private GitHub security advisory](https://github.com/opaquecash/stellar-v1/security/advisories/new)** on this repository.
 
 We aim to acknowledge security reports within **5 business days**.
 
 ## Reporting abuse or sanctions concerns
 
-Open a **[GitHub issue](https://github.com/collinsadi/opaque/issues)** with a clear title (for example, `Abuse report:` or `Sanctions concern:`) and enough detail for us to investigate. Do not include sensitive personal data in public issues when a private advisory is more appropriate.
+Open a **[GitHub issue](https://github.com/opaquecash/stellar-v1/issues)** with a clear title (for example, `Abuse report:` or `Sanctions concern:`) and enough detail for us to investigate. Do not include sensitive personal data in public issues when a private advisory is more appropriate.
 
 The reference wallet also surfaces an in-app summary at `/abuse-policy` (see `frontend/src/components/AbusePolicyPage.tsx`).
 
 ## Supported versions
 
-Security fixes are applied to the latest code on the `main` branch. When we tag a release, notes appear on the [GitHub Releases](https://github.com/collinsadi/opaque/releases) page.
+Security fixes are applied to the latest code on the `main` branch. When we tag a release, notes appear on the [GitHub Releases](https://github.com/opaquecash/stellar-v1/releases) page.
 
 ## Scope
 

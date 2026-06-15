@@ -31,7 +31,7 @@ export function FeatureDisabledNotice({ feature, readOnly = false }: FeatureDisa
             <code className="rounded bg-ink-900/60 px-1 py-0.5 font-mono text-[11px]">{envKey}=true</code>{" "}
             at build time. See{" "}
             <a
-              href="https://github.com/collinsadi/opaque-stellar/blob/main/docs/FEATURE_FLAGS.md"
+              href="https://github.com/opaquecash/stellar-v1/blob/main/docs/FEATURE_FLAGS.md"
               target="_blank"
               rel="noopener noreferrer"
               className="text-neutral-200 underline hover:text-white"

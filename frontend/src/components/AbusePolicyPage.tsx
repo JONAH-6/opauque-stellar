@@ -112,7 +112,7 @@ export function AbusePolicyPage() {
         <p>
           The complete policy and operator runbook are maintained in the repository:{" "}
           <a
-            href="https://github.com/collinsadi/opaque-stellar/blob/main/docs/ABUSE_AND_SANCTIONS_POLICY.md"
+            href="https://github.com/opaquecash/stellar-v1/blob/main/docs/ABUSE_AND_SANCTIONS_POLICY.md"
             target="_blank"
             rel="noopener noreferrer"
             className="text-white underline hover:text-white"
