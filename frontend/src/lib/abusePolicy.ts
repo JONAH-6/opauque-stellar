@@ -24,12 +24,12 @@ export const PUBLIC_CONTACTS = {
   security: {
     label: "Security incidents",
     email: "security@opaqueprotocol.org",
-    url: "https://github.com/opaquecash/stellar-v1/security/advisories/new",
+    url: "https://github.com/collinsadi/opauque-stellar/security/advisories/new",
     description: "Vulnerabilities and active exploitation",
   },
   support: {
     label: "General support",
-    url: "https://github.com/opaquecash/stellar-v1/issues",
+    url: "https://github.com/collinsadi/opauque-stellar/issues",
     description: "Bug reports and general questions (no sensitive victim data)",
   },
 } as const satisfies Record<string, ContactChannel>;

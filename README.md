@@ -14,7 +14,7 @@
 
 <br/>
 
-[**Launch the wallet →**](frontend/) · [**GitHub**](https://github.com/opaquecash/stellar-v1) · [**Solana sibling**](https://github.com/collinsadi/opaque-solana)
+[**Launch the wallet →**](frontend/) · [**GitHub**](https://github.com/collinsadi/opauque-stellar) · [**Solana sibling**](https://github.com/collinsadi/opaque-solana)
 
 <br/>
 
@@ -53,8 +53,8 @@
 Rust · [Stellar CLI](https://developers.stellar.org/docs/build/smart-contracts/getting-started/setup) · Node 20+ · [Freighter](https://freighter.app) · [wasm-pack](https://rustwasm.github.io/wasm-pack/installer/)
 
 ```bash
-git clone https://github.com/opaquecash/stellar-v1.git
-cd stellar-v1
+git clone https://github.com/collinsadi/opauque-stellar.git
+cd opauque-stellar
 ```
 
 ### 1 · Frontend wallet (fastest path)
@@ -189,24 +189,8 @@ Same DKSAP layout as [EIP-5564](https://eips.ethereum.org/EIPS/eip-5564) / [ERC-
 
 | Repo | Chain |
 |:-----|:------|
-| [**stellar-v1**](https://github.com/opaquecash/stellar-v1) (this) | Stellar / Soroban |
+| [**opauque-stellar**](https://github.com/collinsadi/opauque-stellar) (this) | Stellar / Soroban |
 | [opaque-solana](https://github.com/collinsadi/opaque-solana) | Solana |
-
----
-
-## Contributors
-
-Parts of this codebase were written by contributors at the project’s previous home, [**collinsadi/opauque-stellar**](https://github.com/collinsadi/opauque-stellar) (note the spelling: *opauque*, not *opaque*). Much of that work happened during the **Stellar wave** on [Drips](https://drips.network/wave). Development continues in **this** repository because that name cannot be corrected on GitHub right now, and the project needed a cleaner, stricter baseline for open-source work—supply-chain checks, CI gates, security policy, and related hygiene.
-
-Avatars below are generated automatically from Git commit history on the previous repository ([contrib.rocks](https://contrib.rocks) → GitHub Contributors API). New contributions in **this** repo will appear on its own graph once people land commits here.
-
-<a href="https://github.com/collinsadi/opauque-stellar/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=collinsadi/opauque-stellar&columns=10" alt="Contributors to collinsadi/opauque-stellar" />
-</a>
-
-<p align="center">
-  <sub>Made with <a href="https://contrib.rocks">contrib.rocks</a> · <a href="https://github.com/collinsadi/opauque-stellar/graphs/contributors">full contributor graph</a></sub>
-</p>
 
 ---
 

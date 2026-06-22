@@ -46,7 +46,7 @@
   "artifacts": {
     "frontend": {
       "buildCommit": null,
-      "repository": "https://github.com/opaquecash/stellar-v1"
+      "repository": "https://github.com/collinsadi/opauque-stellar"
     },
     "circuits": {
       "v2": {
