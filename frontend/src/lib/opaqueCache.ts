@@ -8,7 +8,9 @@ import { openDB, type DBSchema, type IDBPDatabase } from "idb";
 
 export type CachedAnnouncement = {
   id: string;
+  /** @deprecated Use `network` instead (Stellar) */
   cluster: string;
+  /** @deprecated Use `ledger` instead (Stellar) */
   slot: number;
   transactionSignature: string;
   logIndex: number;
@@ -20,7 +22,9 @@ export type CachedAnnouncement = {
 };
 
 export type SyncState = {
+  /** @deprecated Use `network` instead (Stellar) */
   cluster: string;
+  /** @deprecated Use `lastScannedLedger` instead (Stellar) */
   lastScannedSlot: number;
 };
 

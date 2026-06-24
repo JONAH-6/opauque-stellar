@@ -4,13 +4,13 @@ import { getDocUrl, getUserRecoverySectionUrl } from "../docsLinks";
 describe("docsLinks", () => {
   it("builds GitHub doc URLs", () => {
     expect(getDocUrl("user-recovery")).toBe(
-      "https://github.com/collinsadi/opauque-stellar/blob/main/docs/USER_RECOVERY.md",
+      "https://github.com/collinsadi/opauque-stellar/blob/main/README.md#recovery",
     );
   });
 
   it("builds anchored section URLs", () => {
     expect(getUserRecoverySectionUrl("manual-ghost")).toBe(
-      "https://github.com/collinsadi/opauque-stellar/blob/main/docs/USER_RECOVERY.md#manual-ghost-receives-one-time-browser-bound",
+      "https://github.com/collinsadi/opauque-stellar/blob/main/README.md#recovery",
     );
   });
 });

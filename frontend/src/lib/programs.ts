@@ -156,15 +156,28 @@ export function hexPubkeyToBase58(hexOrAddr: string): string {
   return hexOrAddr.startsWith("G") ? hexOrAddr : hexOrAddr;
 }
 
+import { getNetwork } from "./chain";
+
+function assertNotMainnet(fnName: string): void {
+  if (getNetwork() === "mainnet") {
+    throw new Error(
+      `[Opaque] ${fnName} is not available on mainnet. Feature not yet implemented.`,
+    );
+  }
+}
+
 export async function fetchAllSchemas(): Promise<ParsedSchemaPDA[]> {
+  assertNotMainnet("fetchAllSchemas");
   return [];
 }
 
 export async function fetchAllAttestations(): Promise<unknown[]> {
+  assertNotMainnet("fetchAllAttestations");
   return [];
 }
 
 export async function fetchAttestationPDA(): Promise<string> {
+  assertNotMainnet("fetchAttestationPDA");
   return "";
 }
 

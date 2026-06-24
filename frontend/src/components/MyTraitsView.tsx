@@ -384,7 +384,7 @@ export function MyTraitsView({ onNavigate, readOnly = false }: MyTraitsViewProps
           )}
         </div>
         <div className="flex items-center gap-2">
-          {onNavigate && (
+          {onNavigate && getFeatureFlags().schemaManagement && (
             <button
               type="button"
               onClick={() => onNavigate("attest")}

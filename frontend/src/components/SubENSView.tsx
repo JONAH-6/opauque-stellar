@@ -1,5 +1,8 @@
 import { useState } from "react";
 import { useToast } from "../context/ToastContext";
+import { isFederationIdentifier, resolveDomain } from "../lib/ens";
+import { FeatureDisabledNotice } from "./FeatureDisabledNotice";
+import { isFeatureEnabled } from "../lib/featureFlags";
 
 type SubENSViewProps = {
   onBack: () => void;
@@ -25,46 +28,106 @@ function setStoredName(name: string) {
 
 export function SubENSView({ onBack }: SubENSViewProps) {
   const [input, setInput] = useState(getStoredName() ?? "");
+  const [resolving, setResolving] = useState(false);
+  const [resolvedAddress, setResolvedAddress] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const { showToast } = useToast();
 
-  const handleClaim = () => {
-    const name = input.trim().toLowerCase().replace(/[^a-z0-9-]/g, "");
-    if (!name) {
-      showToast("Enter a name.");
+  const federationEnabled = isFeatureEnabled("demoVerifierLinks");
+
+  const handleLookup = async () => {
+    const trimmed = input.trim();
+    if (!trimmed) return;
+
+    if (!isFederationIdentifier(trimmed)) {
+      setError("Enter a federation identifier (name*domain.com).");
+      setResolvedAddress(null);
       return;
     }
-    setStoredName(name);
-    showToast(`Success! ${name}.opaque.eth is yours.`);
+
+    setResolving(true);
+    setError(null);
+    setResolvedAddress(null);
+
+    try {
+      const address = await resolveDomain(trimmed);
+      if (address) {
+        setResolvedAddress(address);
+        setStoredName(trimmed);
+      } else {
+        setError("Federation lookup returned no address.");
+      }
+    } catch {
+      setError("Federation lookup failed.");
+    } finally {
+      setResolving(false);
+    }
   };
+
+  if (!federationEnabled) {
+    return (
+      <div className="w-full max-w-lg mx-auto">
+        <h2 className="text-lg font-semibold text-white mb-1">Federation / Identifier Lookup</h2>
+        <p className="text-sm text-neutral-500 mb-6">
+          Resolve Stellar federation identifiers (name*domain.com) to addresses.
+        </p>
+        <FeatureDisabledNotice feature="demoVerifierLinks" />
+        <button
+          type="button"
+          onClick={onBack}
+          className="mt-4 py-2.5 px-4 rounded-lg text-sm btn-secondary"
+        >
+          Back
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full max-w-lg mx-auto">
-      <h2 className="text-lg font-semibold text-white mb-1">Setup Sub-ENS</h2>
+      <h2 className="text-lg font-semibold text-white mb-1">Federation Lookup</h2>
       <p className="text-sm text-neutral-500 mb-6">
-        Claim your [name].opaque.eth identity (simulated).
+        Resolve a Stellar federation identifier (name*domain.com) to an on-chain address.
       </p>
       <div className="mb-4">
-        <label className="block text-sm text-neutral-500 mb-1.5">Name</label>
+        <label className="block text-sm text-neutral-500 mb-1.5">Identifier</label>
         <input
           type="text"
           value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder="yourname"
+          onChange={(e) => {
+            setInput(e.target.value);
+            setError(null);
+            setResolvedAddress(null);
+          }}
+          placeholder="yourname*domain.com"
           className="input-field"
         />
-        {input.trim() && (
+        {input.trim() && isFederationIdentifier(input.trim()) && (
           <p className="mt-1.5 text-neutral-500 text-xs font-mono">
-            → {input.trim().toLowerCase().replace(/[^a-z0-9-]/g, "") || "…"}.opaque.eth
+            → Resolving federation identifier
           </p>
         )}
       </div>
+
+      {error && (
+        <p className="text-sm text-neutral-400 mb-4">{error}</p>
+      )}
+
+      {resolvedAddress && (
+        <div className="rounded-xl border border-neutral-500/30 bg-neutral-500/10 px-4 py-3 mb-4">
+          <p className="text-xs text-neutral-400 mb-1">Resolved Address</p>
+          <p className="text-sm font-mono text-white break-all">{resolvedAddress}</p>
+        </div>
+      )}
+
       <div className="flex gap-2">
         <button
           type="button"
-          onClick={handleClaim}
-          className="py-2.5 px-4 rounded-lg text-sm font-medium btn-primary"
+          onClick={handleLookup}
+          disabled={resolving || !input.trim()}
+          className="py-2.5 px-4 rounded-lg text-sm font-medium btn-primary disabled:opacity-40"
         >
-          Claim Name
+          {resolving ? "Resolving…" : "Look Up"}
         </button>
         <button
           type="button"

@@ -26,7 +26,7 @@ export const KNOWN_TRAITS: TraitDefinition[] = [
     id: "high-volume",
     attestationId: 2,
     label: "High Volume Trader",
-    description: "Total stealth volume exceeds 5 SOL",
+    description: "Total stealth volume exceeds 5,000 XLM",
     icon: "trending-up",
     category: "trader",
   },

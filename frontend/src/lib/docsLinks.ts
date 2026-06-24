@@ -41,5 +41,5 @@ export function getUserRecoverySectionUrl(
     "ghost-backup": "recovery",
     "device-migration": "recovery",
   };
-  return `${getDocUrl("user-recovery")}#${anchors[section]}`;
+  return `${docsBaseUrl()}/README.md#${anchors[section]}`;
 }
