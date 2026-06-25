@@ -1,28 +1,16 @@
-# Security Policy
+# Security
 
-## Reporting a vulnerability
+## Authorization
 
-**Please do not** open public GitHub issues for security vulnerabilities.
+See [docs/AUTHORIZATION_MATRIX.md](docs/AUTHORIZATION_MATRIX.md) for the
+cross-contract authorization matrix covering all admin-only and
+authority-gated methods across Opaque Soroban contracts.
 
-Report them through a **[private GitHub security advisory](https://github.com/collinsadi/opauque-stellar/security/advisories/new)** on this repository.
+## Threat Model
 
-We aim to acknowledge security reports within **5 business days**.
+- **Ghost key encryption threat model:** [docs/GHOST_THREAT_MODEL.md](docs/GHOST_THREAT_MODEL.md)
 
-## Reporting abuse or sanctions concerns
+## Reporting a Vulnerability
 
-Open a **[GitHub issue](https://github.com/collinsadi/opauque-stellar/issues)** with a clear title (for example, `Abuse report:` or `Sanctions concern:`) and enough detail for us to investigate. Do not include sensitive personal data in public issues when a private advisory is more appropriate.
-
-The reference wallet also surfaces an in-app summary at `/abuse-policy` (see `frontend/src/components/AbusePolicyPage.tsx`).
-
-## Supported versions
-
-Security fixes are applied to the latest code on the `main` branch. When we tag a release, notes appear on the [GitHub Releases](https://github.com/collinsadi/opauque-stellar/releases) page.
-
-## Scope
-
-- Soroban contracts in `contracts/`
-- Reference frontend in `frontend/`
-- Scanner WASM in `scanner/`
-- Deployment manifests and CI verification scripts
-
-Out of scope: third-party wallets, Stellar network consensus, and self-hosted forks unless they use official deployment credentials we operate.
+This project is experimental and unaudited. If you discover a security issue,
+please open a [GitHub Security Advisory](https://github.com/collinsadi/opauque-stellar/security/advisories/new).
