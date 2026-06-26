@@ -12,6 +12,10 @@ export interface V2WitnessParams {
   issuerPkX: string;
   nonceField: string;
   externalNullifierStr: string;
+  /** Hex-encoded attestation payload (0x-prefixed or bare). When provided, the
+   *  witness builder computes traitDataHash = Poseidon(packed_bytes) to bind the
+   *  proof to on-chain attestation data instead of using the zero placeholder. */
+  traitDataHex?: string;
 }
 
 export interface Groth16ProofResult {

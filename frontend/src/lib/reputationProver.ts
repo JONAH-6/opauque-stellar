@@ -23,9 +23,14 @@ import type { SignTxFn } from "./stellar";
 import { getNetworkPassphrase } from "./chain";
 import {
   generateV1ProofInWorker,
+  generateV2ProofInWorker,
   ProofGenerationCancelledError,
   type ProofProgressCallback,
 } from "./proofWorker/proofWorkerClient";
+
+// V1 proof path is deprecated (#404). Set VITE_REPUTATION_PROOF_V1=true to
+// re-enable it temporarily (e.g. during rollout verification).
+const USE_V1_REP_PROOF = import.meta.env.VITE_REPUTATION_PROOF_V1 === "true";
 
 export type { ProofProgressCallback };
 export { ProofGenerationCancelledError };
@@ -47,32 +52,51 @@ export async function generateReputationProof(
   onProgress: ProofProgressCallback,
   signal?: AbortSignal,
 ): Promise<ProofData> {
-  const { proof, publicSignals } = await generateV1ProofInWorker(
+  if (USE_V1_REP_PROOF) {
+    // Legacy V1 path (VITE_REPUTATION_PROOF_V1=true). Deprecated — see #404.
+    // V1 public signals: [0]=nullifier [1]=is_valid [2]=merkle_root
+    //                    [3]=attestation_id [4]=external_nullifier
+    const { proof, publicSignals } = await generateV1ProofInWorker(
+      {
+        traitAttestationId: trait.attestationId,
+        stealthPrivKeyBytes: Array.from(stealthPrivKeyBytes),
+        externalNullifier,
+      },
+      { onProgress, signal },
+    );
+    const nullifier = publicSignals[0];
+    const attestationIdFromProof = Number(publicSignals[3]);
+    const isValidSignal = String(publicSignals[1] ?? "0");
+    if (isValidSignal !== "1") {
+      throw new Error("Generated proof is invalid (is_valid=0). Rescan traits and regenerate.");
+    }
+    return {
+      proof: {
+        pi_a: proof.pi_a.slice(0, 2),
+        pi_b: proof.pi_b.slice(0, 2),
+        pi_c: proof.pi_c.slice(0, 2),
+      },
+      publicSignals,
+      nullifier,
+      attestationId: Number.isFinite(attestationIdFromProof) ? attestationIdFromProof : trait.attestationId,
+    };
+  }
+
+  // V2 path (default). Public signals: [0]=merkle_root [1]=attestation_id
+  //                                    [2]=external_nullifier [3]=nullifier_hash
+  const { proof, publicSignals } = await generateV2ProofInWorker(
     {
-      traitAttestationId: trait.attestationId,
       stealthPrivKeyBytes: Array.from(stealthPrivKeyBytes),
-      externalNullifier,
+      schemaIdField: String(trait.attestationId),
+      issuerPkX: "0",
+      nonceField: "0",
+      externalNullifierStr: externalNullifier,
     },
     { onProgress, signal },
   );
 
-  // V1 public signal order (canonical — see docs/PUBLIC_SIGNALS.md):
-  //   [0] nullifier  [1] is_valid  [2] merkle_root  [3] attestation_id
-  //   [4] external_nullifier. Must match circuits/stealth_attestation.circom
-  //   and contracts/reputation-verifier.
-  const nullifier = publicSignals[0];
-  const attestationIdFromProof = Number(publicSignals[3]);
-  const isValidSignal = String(publicSignals[1] ?? "0");
-
-  if (isValidSignal !== "1") {
-    console.error("❌ [Opaque] Generated proof has is_valid=0.", {
-      traitId: trait.attestationId,
-      publicSignals,
-    });
-    throw new Error(
-      "Generated proof is invalid (is_valid=0). Rescan traits and regenerate."
-    );
-  }
+  const nullifier = publicSignals[3];
+  const attestationIdFromProof = Number(publicSignals[1]);
 
   return {
     proof: {

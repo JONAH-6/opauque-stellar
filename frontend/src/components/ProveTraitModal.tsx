@@ -78,7 +78,6 @@ export function ProveTraitModal({ trait, onClose }: ProveTraitModalProps) {
         ephemeral_pubkey: t.ephemeralPubkey ?? [],
       }));
 
-      const externalNullifier = String(Date.now());
       if (!trait.ephemeralPubkey || trait.ephemeralPubkey.length !== 33) {
         throw new Error("Trait is missing ephemeral pubkey. Please rescan announcements and try again.");
       }
@@ -87,6 +86,16 @@ export function ProveTraitModal({ trait, onClose }: ProveTraitModalProps) {
         masterKeys.viewPrivKey,
         new Uint8Array(trait.ephemeralPubkey)
       );
+
+      // Deterministic external nullifier derived from attestation UID + user-controlled entropy.
+      // attestation UID  = trait.attestationId (on-chain trait type identifier)
+      // user entropy     = first 16 bytes of the stealth private key (controlled by wallet seeds)
+      // Combined value fits comfortably within the BN254 scalar field (<2^254).
+      const _uidN = BigInt(trait.attestationId);
+      const _entN = Array.from(stealthPrivKey.slice(0, 16)).reduce(
+        (a: bigint, b: number) => (a << 8n) | BigInt(b), 0n
+      );
+      const externalNullifier = String((_uidN << 128n) | _entN);
 
       const proofData = await generateReputationProof(
         wasm,
@@ -98,8 +107,8 @@ export function ProveTraitModal({ trait, onClose }: ProveTraitModalProps) {
         abortController.signal,
       );
 
-      // Root in snarkjs public signals is often decimal; convert to bytes32 hex for on-chain updates.
-      const rawRootSignal = proofData.publicSignals?.[2];
+      // V2 public signals: [0]=merkle_root [1]=attestation_id [2]=external_nullifier [3]=nullifier_hash
+      const rawRootSignal = proofData.publicSignals?.[0];
       if (rawRootSignal != null) {
         try {
           const merkleRootBytes32 = toHex(BigInt(rawRootSignal), { size: 32 });
@@ -140,8 +149,9 @@ export function ProveTraitModal({ trait, onClose }: ProveTraitModalProps) {
       if (!publicKey || !signTransaction) {
         throw new Error("Connect Freighter to submit the proof.");
       }
-      const merkleRoot = merkleRootOverride ?? proofState.proof?.publicSignals?.[2] ?? "0x0";
-      const externalNullifier = proofState.proof?.publicSignals?.[4] ?? "0";
+      // V2 public signals: [0]=merkle_root [2]=external_nullifier
+      const merkleRoot = merkleRootOverride ?? proofState.proof?.publicSignals?.[0] ?? "0x0";
+      const externalNullifier = proofState.proof?.publicSignals?.[2] ?? "0";
 
       const hash = await submitProofOnChain(proof, merkleRoot, externalNullifier, signTransaction, publicKey);
       setTxHash(hash);
