@@ -11,12 +11,30 @@ export async function buildV2Witness(params: V2WitnessParams): Promise<Record<st
   const schemaId = stringToBigInt(params.schemaIdField);
   const issuerPkX = stringToBigInt(params.issuerPkX);
   const nonce = stringToBigInt(params.nonceField);
-  const traitDataHash = 0n;
   const externalNullifier = stringToBigInt(params.externalNullifierStr.trim());
 
   const poseidon = await buildPoseidon();
   const F = poseidon.F;
   const ph = (inputs: bigint[]): bigint => F.toObject(poseidon(inputs)) as bigint;
+
+  // Compute traitDataHash from on-chain attestation payload when provided.
+  // Bytes are packed into 31-byte BN254-safe chunks then Poseidon-hashed.
+  let traitDataHash = 0n;
+  if (params.traitDataHex && params.traitDataHex.replace(/^0x/, "").length > 0) {
+    const hex = params.traitDataHex.replace(/^0x/, "");
+    const dataBytes = new Uint8Array(hex.length / 2);
+    for (let i = 0; i < hex.length; i += 2) {
+      dataBytes[i / 2] = parseInt(hex.slice(i, i + 2), 16);
+    }
+    const chunks: bigint[] = [];
+    for (let i = 0; i < dataBytes.length; i += 31) {
+      const chunk = dataBytes.slice(i, Math.min(i + 31, dataBytes.length));
+      let n = 0n;
+      for (const b of chunk) n = (n << 8n) | BigInt(b);
+      chunks.push(n);
+    }
+    if (chunks.length > 0) traitDataHash = ph(chunks);
+  }
 
   const leaf: bigint = ph([stealthPk, schemaId, issuerPkX, traitDataHash, nonce]);
 

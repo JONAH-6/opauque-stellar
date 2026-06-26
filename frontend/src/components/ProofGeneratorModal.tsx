@@ -149,6 +149,7 @@ export function ProofGeneratorModal({ trait, onClose }: ProofGeneratorModalProps
           issuerPkX: trait.merkleLeafPreimage.issuerPkX,
           nonceField: trait.merkleLeafPreimage.nonceField,
           externalNullifierStr: externalNullifier,
+          traitDataHex: trait.dataHex,
         },
         {
           signal: abortController.signal,
