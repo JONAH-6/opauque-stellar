@@ -88,12 +88,12 @@ pub enum ReputationError {
     BatchTooLarge = 9,
     /// A direct (non-timelocked) call was rejected because a timelock delay
     /// is configured — the caller must use the schedule/execute flow instead.
-    TimelockEnabled = 9,
+    TimelockEnabled = 10,
     /// `schedule_*` was called while no timelock delay is configured (delay == 0).
-    TimelockNotEnabled = 10,
-    ActionNotFound = 11,
-    ActionNotReady = 12,
-    ActionAlreadyFinalized = 13,
+    TimelockNotEnabled = 11,
+    ActionNotFound = 12,
+    ActionNotReady = 13,
+    ActionAlreadyFinalized = 14,
 }
 
 /// A sensitive admin action that has been scheduled behind the optional timelock.
@@ -101,13 +101,8 @@ pub enum ReputationError {
 #[contracttype]
 #[derive(Clone)]
 pub enum PendingAction {
-    UpdateMerkleRoot {
-        root: BytesN<32>,
-        dataset_hash: BytesN<32>,
-    },
-    TransferAdmin {
-        new_admin: Address,
-    },
+    UpdateMerkleRoot(BytesN<32>, BytesN<32>),
+    TransferAdmin(Address),
 }
 
 #[contracttype]
@@ -404,6 +399,7 @@ impl ReputationVerifier {
             .unwrap_or(false)
         {
             return Err(ReputationError::ContractFrozen);
+        }
         let config: VerifierConfig = env
             .storage()
             .instance()
@@ -506,7 +502,7 @@ impl ReputationVerifier {
         schedule_action(
             &env,
             admin,
-            PendingAction::UpdateMerkleRoot { root, dataset_hash },
+            PendingAction::UpdateMerkleRoot(root, dataset_hash),
         )
     }
 
@@ -516,7 +512,7 @@ impl ReputationVerifier {
         admin: Address,
         new_admin: Address,
     ) -> Result<u64, ReputationError> {
-        schedule_action(&env, admin, PendingAction::TransferAdmin { new_admin })
+        schedule_action(&env, admin, PendingAction::TransferAdmin(new_admin))
     }
 
     pub fn get_pending_action(env: Env, action_id: u64) -> Result<PendingActionEntry, ReputationError> {
@@ -549,11 +545,6 @@ impl ReputationVerifier {
         if entry.executed || entry.cancelled {
             return Err(ReputationError::ActionAlreadyFinalized);
         }
-        history.push_back(root.clone());
-        env.storage().instance().set(&history_key(&env), &history);
-        env.storage()
-            .instance()
-            .set(&last_root_update_key(&env), &ledger);
         entry.cancelled = true;
         env.storage()
             .persistent()
@@ -592,10 +583,10 @@ impl ReputationVerifier {
             return Err(ReputationError::ActionNotReady);
         }
         match entry.action.clone() {
-            PendingAction::UpdateMerkleRoot { root, dataset_hash } => {
+            PendingAction::UpdateMerkleRoot(root, dataset_hash) => {
                 apply_update_merkle_root(&env, &admin, root, dataset_hash)?;
             }
-            PendingAction::TransferAdmin { new_admin } => {
+            PendingAction::TransferAdmin(new_admin) => {
                 config.admin = new_admin.clone();
                 env.storage()
                     .instance()
@@ -1363,6 +1354,151 @@ mod test {
         let root2 = BytesN::from_array(&env, &[0x02u8; 32]);
         client.update_merkle_root(&admin, &root2, &root2);
         assert_eq!(client.last_root_update(), 20u32);
+    }
+
+    // ── Issue #412: nullifier derivation cross-test ──────────────────────
+    //
+    // These tests use the same nullifier bytes as the frontend + circuit
+    // fixtures in circuits/fixtures/nullifier-cross-test.json to ensure
+    // that the contract's nullifier storage key derivation is consistent
+    // across the stack. If the fixture values change, these bytes must be
+    // updated to match.
+
+    /// V1 fixture nullifier bytes (from expectedPublicSignals.nullifier):
+    ///   10172493208287336886467538226873104459597091148521751934113172902237540438853
+    ///   = 0x167d6d57c292e7dc9b2ede919fd461d3df9b542175855a98971243bcd75bd345
+    const V1_FIXTURE_NULLIFIER: [u8; 32] = [
+        0x16, 0x7d, 0x6d, 0x57, 0xc2, 0x92, 0xe7, 0xdc,
+        0x9b, 0x2e, 0xde, 0x91, 0x9f, 0xd4, 0x61, 0xd3,
+        0xdf, 0x9b, 0x54, 0x21, 0x75, 0x85, 0x5a, 0x98,
+        0x97, 0x12, 0x43, 0xbc, 0xd7, 0x5b, 0xd3, 0x45,
+    ];
+
+    /// V2 fixture nullifier_hash bytes (from publicInputs.nullifier_hash):
+    ///   18161985364773035568176751167473209972315890565511615340732160378183733422834
+    ///   = 0x282751c63cb34a1b2694ac7ae6d7335d41392f230c3e3a1b9d91c57e2c972af2
+    const V2_FIXTURE_NULLIFIER: [u8; 32] = [
+        0x28, 0x27, 0x51, 0xc6, 0x3c, 0xb3, 0x4a, 0x1b,
+        0x26, 0x94, 0xac, 0x7a, 0xe6, 0xd7, 0x33, 0x5d,
+        0x41, 0x39, 0x2f, 0x23, 0x0c, 0x3e, 0x3a, 0x1b,
+        0x9d, 0x91, 0xc5, 0x7e, 0x2c, 0x97, 0x2a, 0xf2,
+    ];
+
+    #[test]
+    fn test_nullifier_cross_test_v1_fixture_bytes_are_valid_storage_key() {
+        let (env, admin, _, client, mock_id) = setup_with_mock();
+        let root = BytesN::from_array(&env, &[0xAAu8; 32]);
+        client.update_merkle_root(&admin, &root, &BytesN::from_array(&env, &[0xBBu8; 32]));
+        let user = Address::generate(&env);
+        let nullifier = BytesN::from_array(&env, &V1_FIXTURE_NULLIFIER);
+        let mut ids = Vec::new(&env);
+        ids.push_back(nullifier.clone());
+
+        // Before spending — must be unspent
+        let statuses = client.are_nullifiers_spent(&ids);
+        assert!(!statuses.get(0).unwrap());
+
+        // Spend the nullifier
+        client.verify_reputation(
+            &user,
+            &mock_id,
+            &BytesN::from_array(&env, &[0u8; 64]),
+            &BytesN::from_array(&env, &[0u8; 128]),
+            &BytesN::from_array(&env, &[0u8; 64]),
+            &root,
+            &1u64,
+            &1u64,
+            &nullifier,
+            &0u32,
+        );
+
+        // After spending — must be spent
+        let statuses2 = client.are_nullifiers_spent(&ids);
+        assert!(statuses2.get(0).unwrap());
+
+        // Replay must be rejected
+        let replay = client.try_verify_reputation(
+            &user,
+            &mock_id,
+            &BytesN::from_array(&env, &[0u8; 64]),
+            &BytesN::from_array(&env, &[0u8; 128]),
+            &BytesN::from_array(&env, &[0u8; 64]),
+            &root,
+            &1u64,
+            &1u64,
+            &nullifier,
+            &0u32,
+        );
+        assert_eq!(replay, Err(Ok(ReputationError::NullifierUsed)));
+    }
+
+    #[test]
+    fn test_nullifier_cross_test_v2_fixture_bytes_are_valid_storage_key() {
+        let (env, admin, _, client, mock_id) = setup_with_mock();
+        let root = BytesN::from_array(&env, &[0xCCu8; 32]);
+        client.update_merkle_root(&admin, &root, &BytesN::from_array(&env, &[0xDDu8; 32]));
+        let user = Address::generate(&env);
+        let nullifier = BytesN::from_array(&env, &V2_FIXTURE_NULLIFIER);
+        let mut ids = Vec::new(&env);
+        ids.push_back(nullifier.clone());
+
+        // Confirm the fixture nullifier works as a storage key (unspent → spent)
+        let before = client.are_nullifiers_spent(&ids);
+        assert!(!before.get(0).unwrap());
+
+        client.verify_reputation(
+            &user,
+            &mock_id,
+            &BytesN::from_array(&env, &[0u8; 64]),
+            &BytesN::from_array(&env, &[0u8; 128]),
+            &BytesN::from_array(&env, &[0u8; 64]),
+            &root,
+            &1u64,
+            &1u64,
+            &nullifier,
+            &0u32,
+        );
+
+        let after = client.are_nullifiers_spent(&ids);
+        assert!(after.get(0).unwrap());
+    }
+
+    #[test]
+    fn test_nullifier_cross_test_v1_and_v2_are_distinct() {
+        let (env, admin, _, client, mock_id) = setup_with_mock();
+        let root = BytesN::from_array(&env, &[0xEEu8; 32]);
+        client.update_merkle_root(&admin, &root, &BytesN::from_array(&env, &[0xFFu8; 32]));
+        let user = Address::generate(&env);
+        let v1 = BytesN::from_array(&env, &V1_FIXTURE_NULLIFIER);
+        let v2 = BytesN::from_array(&env, &V2_FIXTURE_NULLIFIER);
+
+        // Spend V1 fixture nullifier
+        client.verify_reputation(
+            &user,
+            &mock_id,
+            &BytesN::from_array(&env, &[0u8; 64]),
+            &BytesN::from_array(&env, &[0u8; 128]),
+            &BytesN::from_array(&env, &[0u8; 64]),
+            &root,
+            &1u64,
+            &1u64,
+            &v1,
+            &0u32,
+        );
+
+        // V2 fixture nullifier must still be spendable (distinct from V1)
+        client.verify_reputation(
+            &user,
+            &mock_id,
+            &BytesN::from_array(&env, &[0u8; 64]),
+            &BytesN::from_array(&env, &[0u8; 128]),
+            &BytesN::from_array(&env, &[0u8; 64]),
+            &root,
+            &1u64,
+            &1u64,
+            &v2,
+            &0u32,
+        );
     }
 
     // ── Issue #380: optional timelock for sensitive admin actions ─────────

@@ -1,0 +1,37 @@
+{
+  "description": "Shared nullifier derivation test vectors bridging frontend and contract tests.",
+  "sourceCircuits": {
+    "v1": "circuits/stealth_attestation.circom",
+    "v2": "circuits/v2/stealth_reputation.circom"
+  },
+  "vectors": {
+    "v1": {
+      "description": "V1 circuit: nullifier = Poseidon(stealth_private_key, external_nullifier)",
+      "circuitFixtureSource": "fixtures/v1/valid-input.json",
+      "publicInputs": {
+        "merkle_root": "12633498058421584697057426124523522724255755080497491398564150125536385767071",
+        "attestation_id": "42",
+        "external_nullifier": "1001"
+      },
+      "expectedPublicSignals": {
+        "nullifier": "10172493208287336886467538226873104459597091148521751934113172902237540438853",
+        "is_valid": "1",
+        "merkle_root": "12633498058421584697057426124523522724255755080497491398564150125536385767071",
+        "attestation_id": "42",
+        "external_nullifier": "1001"
+      },
+      "expectedNullifierBytes": "0x167d6d57c292e7dc9b2ede919fd461d3df9b542175855a98971243bcd75bd345"
+    },
+    "v2": {
+      "description": "V2 circuit: nullifier_hash = Poseidon(stealth_pk, external_nullifier) as public input",
+      "circuitFixtureSource": "fixtures/v2/valid-input.json",
+      "publicInputs": {
+        "merkle_root": "17023058356647283626690523120381754252259259245930344291948072880075204385955",
+        "attestation_id": "7",
+        "external_nullifier": "9001",
+        "nullifier_hash": "18161985364773035568176751167473209972315890565511615340732160378183733422834"
+      },
+      "expectedNullifierBytes": "0x282751c63cb34a1b2694ac7ae6d7335d41392f230c3e3a1b9d91c57e2c972af2"
+    }
+  }
+}

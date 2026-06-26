@@ -23,6 +23,7 @@
     "ci:local": "bash scripts/ci-local.sh",
     "audit:supply-chain": "bash scripts/check-npm-audit.sh",
     "check:wasm-sizes": "tsx scripts/check-wasm-sizes.ts",
+    "check:circuit-constraints": "tsx scripts/check-circuit-constraints.ts",
     "sign:artifacts": "tsx scripts/sign-release-artifacts.ts",
     "verify:signatures": "tsx scripts/verify-artifact-signatures.ts"
   },

@@ -22,6 +22,7 @@ import {
   ProofGenerationCancelledError,
   type ProofWorkerStage,
 } from "../lib/proofWorker/proofWorkerClient";
+import { createPortableProof, exportProofToFile } from "../lib/proofExport";
 
 // =============================================================================
 // Types
@@ -444,13 +445,30 @@ export function ProofGeneratorModal({ trait, onClose }: ProofGeneratorModalProps
                 </button>
                 <button
                   type="button"
-                  onClick={handleSubmitOnChain}
-                  disabled={!publicKey}
-                  className="flex-1 rounded-xl bg-white text-black border border-white py-2.5 text-sm font-semibold hover:bg-black hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  onClick={() => {
+                    const portable = createPortableProof({
+                      proof: proof.proof,
+                      publicSignals: proof.publicSignals,
+                      circuitVersion: "v2",
+                      nullifier: proof.nullifierHash,
+                      schemaId: proof.schemaId,
+                      externalNullifier: proof.publicSignals[2],
+                    });
+                    exportProofToFile(portable);
+                  }}
+                  className="flex-1 rounded-xl border border-ink-700 bg-ink-800 py-2.5 text-sm font-medium text-white hover:bg-ink-700 transition-colors"
                 >
-                  Submit On-Chain
+                  Export as File
                 </button>
               </div>
+              <button
+                type="button"
+                onClick={handleSubmitOnChain}
+                disabled={!publicKey}
+                className="w-full rounded-xl bg-white text-black border border-white py-2.5 text-sm font-semibold hover:bg-black hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                Submit On-Chain
+              </button>
               {getDemoVerifierUrl() && (
                 <a
                   href={getDemoVerifierUrl()!}

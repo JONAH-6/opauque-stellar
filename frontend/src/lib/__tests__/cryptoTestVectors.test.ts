@@ -8,6 +8,11 @@
  */
 
 import { describe, it, expect } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 import { secp256k1 } from "@noble/curves/secp256k1";
 import { keccak_256 } from "@noble/hashes/sha3";
 import { sha256 } from "@noble/hashes/sha2";
@@ -144,6 +149,40 @@ describe("Cross-language Stellar account derivation vectors (Issue #91)", () => 
     // View tag should be in range 0-255
     expect(viewTag).toBeGreaterThanOrEqual(0);
     expect(viewTag).toBeLessThanOrEqual(255);
+  });
+});
+
+describe("Nullifier derivation cross-test (Issue #412)", () => {
+  const fixturePath = "../../../../circuits/fixtures/nullifier-cross-test.json";
+
+  it("V1 nullifier bytes match expected circuit output", () => {
+    const fixture = JSON.parse(readFileSync(resolve(__dirname, fixturePath), "utf8"));
+    const v1 = fixture.vectors.v1;
+    const nullifierBytes = hexToBytes(v1.expectedNullifierBytes);
+    const nullifierBigInt = bytesToBigInt(nullifierBytes);
+
+    // The expected nullifier from the circuit must be representable as bytes
+    expect(nullifierBytes.length).toBe(32);
+    expect(nullifierBigInt.toString()).toBe(v1.expectedPublicSignals.nullifier);
+    expect(v1.expectedPublicSignals.is_valid).toBe("1");
+  });
+
+  it("V2 nullifier hash bytes match expected circuit input", () => {
+    const fixture = JSON.parse(readFileSync(resolve(__dirname, fixturePath), "utf8"));
+    const v2 = fixture.vectors.v2;
+    const nullifierBytes = hexToBytes(v2.expectedNullifierBytes);
+
+    expect(nullifierBytes.length).toBe(32);
+    const nullifierBigInt = bytesToBigInt(nullifierBytes);
+    expect(nullifierBigInt.toString()).toBe(v2.publicInputs.nullifier_hash);
+  });
+
+  it("V1 and V2 fixtures produce distinct nullifier bytes", () => {
+    const fixture = JSON.parse(readFileSync(resolve(__dirname, fixturePath), "utf8"));
+    const v1Bytes = hexToBytes(fixture.vectors.v1.expectedNullifierBytes);
+    const v2Bytes = hexToBytes(fixture.vectors.v2.expectedNullifierBytes);
+
+    expect(v1Bytes).not.toEqual(v2Bytes);
   });
 });
 

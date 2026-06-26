@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "description": "Circuit constraint count thresholds. Increase only with justification in the PR description.",
+  "circuits": {
+    "v1": {
+      "source": "circuits/stealth_attestation.circom",
+      "maxConstraints": 51000,
+      "reason": "V1 stealth attestation circuit with 20-level Merkle tree, BabyJubJub ECDH, Poseidon hashing. Baseline ~50,000 constraints.",
+      "lastVerified": "2026-06-26"
+    },
+    "v2": {
+      "source": "circuits/v2/stealth_reputation.circom",
+      "maxConstraints": 42000,
+      "reason": "V2 stealth reputation circuit with 20-level Merkle tree, Poseidon hashing, schema binding. Baseline ~41,000 constraints.",
+      "lastVerified": "2026-06-26"
+    }
+  }
+}
