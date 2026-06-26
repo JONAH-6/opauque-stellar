@@ -28,6 +28,7 @@ import { isSimulationSuccess } from "../lib/sorobanErrors";
 import { deployedAddresses } from "../contracts/deployedAddresses";
 import { useWallet } from "../hooks/useWallet";
 import { ModalShell } from "./ModalShell";
+import { fetchRootHistory, type RootHistoryEntry } from "../lib/programs";
 
 // =============================================================================
 // Constants
@@ -344,6 +345,114 @@ function AdminCard({ status, publicKey, signTransaction, onRefresh }: AdminCardP
 }
 
 // =============================================================================
+// Reputation root history audit view (#373)
+// =============================================================================
+
+const ROOT_HISTORY_PAGE_SIZE = 10;
+
+function RootHistoryAudit({ publicKey }: { publicKey: string }) {
+  const [entries, setEntries] = useState<RootHistoryEntry[]>([]);
+  const [offset, setOffset] = useState(0);
+  const [isLoading, setIsLoading] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+
+  const load = useCallback(
+    async (newOffset: number) => {
+      setIsLoading(true);
+      const page = await fetchRootHistory(
+        publicKey,
+        deployedAddresses.reputationVerifier,
+        newOffset,
+        ROOT_HISTORY_PAGE_SIZE,
+      );
+      setEntries(page);
+      setOffset(newOffset);
+      setHasMore(page.length === ROOT_HISTORY_PAGE_SIZE);
+      setIsLoading(false);
+    },
+    [publicKey],
+  );
+
+  useEffect(() => {
+    void load(0);
+  }, [load]);
+
+  return (
+    <div className="rounded-xl border border-ink-700 bg-ink-900/40 px-4 py-3 space-y-3">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h4 className="text-sm font-semibold text-white">Reputation Root History</h4>
+          <p className="text-xs text-mist mt-0.5">Paginated Merkle root history from the Reputation Verifier.</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => void load(offset)}
+          disabled={isLoading}
+          className="rounded-lg border border-ink-700 bg-ink-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-ink-800 disabled:opacity-50 transition-colors"
+        >
+          {isLoading ? (
+            <span className="flex items-center gap-1.5">
+              <span className="h-3 w-3 animate-spin rounded-full border border-ink-600 border-t-white" />
+              Loading…
+            </span>
+          ) : "Refresh"}
+        </button>
+      </div>
+
+      {entries.length === 0 && !isLoading ? (
+        <p className="text-xs text-mist italic py-2">No root history found — no Merkle roots have been committed yet.</p>
+      ) : (
+        <>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-ink-700 text-left">
+                  <th className="pb-2 pr-4 text-[10px] uppercase tracking-widest text-mist/60 font-semibold w-12">Ledger</th>
+                  <th className="pb-2 pr-4 text-[10px] uppercase tracking-widest text-mist/60 font-semibold">Root Hash</th>
+                  <th className="pb-2 text-[10px] uppercase tracking-widest text-mist/60 font-semibold">Dataset Hash</th>
+                </tr>
+              </thead>
+              <tbody>
+                {entries.map((e, i) => (
+                  <tr key={i} className="border-b border-ink-800/50 last:border-0">
+                    <td className="py-1.5 pr-4 font-mono text-white">{e.ledger.toLocaleString()}</td>
+                    <td className="py-1.5 pr-4 font-mono text-mist/80 truncate max-w-[180px]" title={e.root}>
+                      {e.root.slice(0, 18)}…{e.root.slice(-6)}
+                    </td>
+                    <td className="py-1.5 font-mono text-mist/60 truncate max-w-[180px]" title={e.datasetHash}>
+                      {e.datasetHash.slice(0, 18)}…{e.datasetHash.slice(-6)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="flex gap-2 justify-end pt-1">
+            <button
+              type="button"
+              onClick={() => void load(Math.max(0, offset - ROOT_HISTORY_PAGE_SIZE))}
+              disabled={offset === 0 || isLoading}
+              className="rounded-lg border border-ink-700 bg-ink-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-ink-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              Prev
+            </button>
+            <button
+              type="button"
+              onClick={() => void load(offset + ROOT_HISTORY_PAGE_SIZE)}
+              disabled={!hasMore || isLoading}
+              className="rounded-lg border border-ink-700 bg-ink-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-ink-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              Next
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// =============================================================================
 // Multisig guidance
 // =============================================================================
 
@@ -579,6 +688,8 @@ export function AdminPanel() {
           ))}
         </div>
       )}
+
+      <RootHistoryAudit publicKey={publicKey} />
 
       <MultisigGuide />
     </div>

@@ -2,11 +2,21 @@
  * Soroban contract invocation helpers for Schema Registry, Attestation Engine, Groth16.
  */
 
-import { nativeToScVal, StrKey } from "@stellar/stellar-sdk";
+import {
+  Account,
+  BASE_FEE,
+  Contract,
+  TransactionBuilder,
+  nativeToScVal,
+  scValToNative,
+  StrKey,
+} from "@stellar/stellar-sdk";
 import { deployedAddresses } from "../contracts/deployedAddresses";
-import { bytesToScVal, invokeContractMethod } from "./stellar";
+import { bytesToScVal, getSorobanServer, invokeContractMethod } from "./stellar";
 import type { SignTxFn } from "./stellar";
 import { bytesN32ToScVal } from "./scvalEncoding";
+import { getNetworkPassphrase } from "./chain";
+import { isSimulationSuccess } from "./sorobanErrors";
 
 export const SCHEMA_REGISTRY_CONTRACT_ID = deployedAddresses.schemaRegistry;
 export const ATTESTATION_ENGINE_V2_CONTRACT_ID = deployedAddresses.attestationEngineV2;
@@ -359,4 +369,73 @@ export interface ParsedSchemaPDA {
   name: string;
   fieldDefinitions: string;
   deprecated: boolean;
+}
+
+/** A single entry from the reputation verifier root history. */
+export interface RootHistoryEntry {
+  /** 0x-prefixed hex root hash */
+  root: string;
+  /** Ledger sequence at which this root was committed */
+  ledger: number;
+  /** 0x-prefixed hex dataset hash */
+  datasetHash: string;
+}
+
+function bufToHex(buf: unknown): string {
+  if (Buffer.isBuffer(buf)) return "0x" + buf.toString("hex");
+  if (buf instanceof Uint8Array) return "0x" + Buffer.from(buf).toString("hex");
+  return String(buf);
+}
+
+/**
+ * Fetches paginated root history entries from the reputation verifier contract.
+ * Calls `get_root_entries(offset, limit)` which returns Vec<MerkleRootEntry>
+ * (each entry has root, ledger, dataset_hash).
+ *
+ * Returns an empty array gracefully when there is no history yet.
+ */
+export async function fetchRootHistory(
+  publicKey: string,
+  contractId: string,
+  offset: number,
+  limit: number,
+): Promise<RootHistoryEntry[]> {
+  try {
+    const server = getSorobanServer();
+    const passphrase = getNetworkPassphrase();
+    const fakeAccount = new Account(publicKey, "0");
+    const contract = new Contract(contractId);
+    const tx = new TransactionBuilder(fakeAccount, {
+      fee: BASE_FEE,
+      networkPassphrase: passphrase,
+    })
+      .addOperation(
+        contract.call(
+          "get_root_entries",
+          nativeToScVal(offset, { type: "u32" }),
+          nativeToScVal(limit, { type: "u32" }),
+        ),
+      )
+      .setTimeout(30)
+      .build();
+
+    const sim = await server.simulateTransaction(tx);
+    if (!isSimulationSuccess(sim) || !sim.result) return [];
+
+    const raw = scValToNative(sim.result.retval);
+    if (!Array.isArray(raw)) return [];
+
+    return raw
+      .filter((e) => e && typeof e === "object")
+      .map((e) => {
+        const entry = e as Record<string, unknown>;
+        return {
+          root: bufToHex(entry["root"]),
+          ledger: typeof entry["ledger"] === "number" ? entry["ledger"] : Number(entry["ledger"] ?? 0),
+          datasetHash: bufToHex(entry["dataset_hash"]),
+        };
+      });
+  } catch {
+    return [];
+  }
 }
