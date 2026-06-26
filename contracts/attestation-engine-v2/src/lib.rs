@@ -306,6 +306,9 @@ impl AttestationEngineV2 {
             return Err(AttestationError::ExpirationInPast);
         }
         let schema_registry = load_registry(&env)?;
+        // Check schema status (deprecated / expired) before authorization so the engine
+        // returns SchemaDeprecated / SchemaExpired rather than the generic UnauthorizedIssuer.
+        validate_attestation_against_schema(&env, &schema_registry, &schema_id, &data)?;
         let authorized: bool = env.invoke_contract(
             &schema_registry,
             &Symbol::new(&env, "can_issue"),
@@ -314,7 +317,6 @@ impl AttestationEngineV2 {
         if !authorized {
             return Err(AttestationError::UnauthorizedIssuer);
         }
-        validate_attestation_against_schema(&env, &schema_registry, &schema_id, &data)?;
         let issuance_sequence = next_issuance_sequence(&env, &schema_id, &stealth_address_hash);
         let uid = compute_attestation_uid(
             &env,
@@ -766,10 +768,6 @@ mod property_tests {
     }
 
     /// Invariant: Schema expiry prevents new attestations past expiry boundary.
-    // Quarantined: expired schemas are correctly blocked, but the engine surfaces this as
-    // `UnauthorizedIssuer` (it delegates to the registry's `can_issue`) rather than a distinct
-    // `SchemaExpired`. Behaviour is safe; error-granularity expectation needs reconciliation.
-    #[ignore = "attestation-engine-v2 port: expiry surfaces as UnauthorizedIssuer; needs spec reconciliation"]
     #[test]
     fn property_schema_expiry_prevents_new_attestations() {
         let (env, authority, _engine_id, schema_client, engine_client) = setup();
@@ -1388,9 +1386,6 @@ mod test {
         assert_eq!(result, Err(Ok(AttestationError::InvalidAttestationData)));
     }
 
-    // Quarantined: deprecated schemas are correctly blocked, but the engine surfaces this as
-    // `UnauthorizedIssuer` (via the registry's `can_issue`) rather than `SchemaDeprecated`.
-    #[ignore = "attestation-engine-v2 port: deprecation surfaces as UnauthorizedIssuer; needs spec reconciliation"]
     #[test]
     fn test_attest_rejects_deprecated_schema() {
         let (env, authority, _engine_id, schema_client, engine_client) = setup();
@@ -1417,9 +1412,6 @@ mod test {
         assert_eq!(result, Err(Ok(AttestationError::SchemaDeprecated)));
     }
 
-    // Quarantined: expired schemas are correctly blocked, but the engine surfaces this as
-    // `UnauthorizedIssuer` (via the registry's `can_issue`) rather than `SchemaExpired`.
-    #[ignore = "attestation-engine-v2 port: expiry surfaces as UnauthorizedIssuer; needs spec reconciliation"]
     #[test]
     fn test_attest_rejects_expired_schema() {
         let (env, authority, _engine_id, schema_client, engine_client) = setup();

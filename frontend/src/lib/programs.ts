@@ -45,6 +45,35 @@ export function mapSchemaManagementError(error: unknown): string {
   return message || "Schema management transaction failed.";
 }
 
+export function mapAttestationIssuanceError(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  if (/SchemaDeprecated|Error\(Contract, #13\)|#13\b/i.test(message)) {
+    return "This schema has been deprecated and no longer accepts new attestations.";
+  }
+  if (/SchemaExpired|Error\(Contract, #14\)|#14\b/i.test(message)) {
+    return "This schema has expired and no longer accepts new attestations.";
+  }
+  if (/UnauthorizedIssuer|Error\(Contract, #2\)|#2\b/i.test(message)) {
+    return "Your wallet is not an authorized issuer for this schema.";
+  }
+  if (/Paused|Error\(Contract, #11\)|#11\b/i.test(message)) {
+    return "Attestation issuance is currently paused by the contract admin.";
+  }
+  if (/DataTooLarge|Error\(Contract, #1\)|#1\b/i.test(message)) {
+    return "Attestation data exceeds the maximum allowed size.";
+  }
+  if (/InvalidAttestationData|Error\(Contract, #12\)|#12\b/i.test(message)) {
+    return "Attestation data does not match the schema field definitions.";
+  }
+  if (/ExpirationInPast|Error\(Contract, #3\)|#3\b/i.test(message)) {
+    return "The specified expiration ledger is already in the past.";
+  }
+  if (/SchemaNotFound|Error\(Contract, #15\)|#15\b/i.test(message)) {
+    return "Schema was not found on-chain. Verify the schema ID and try again.";
+  }
+  return message || "Attestation issuance failed.";
+}
+
 export function mapAttestationRevocationError(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);
   if (/AlreadyRevoked|already revoked|Error\(Contract, #5\)|#5\b/i.test(message)) {
