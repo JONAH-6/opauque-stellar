@@ -24,6 +24,7 @@ import {
   submitProofOnChain,
 } from "../lib/reputationProver";
 import type { DiscoveredTrait, ProofData } from "../lib/reputation";
+import { createPortableProof, exportProofToFile } from "../lib/proofExport";
 import { ModalShell } from "./ModalShell";
 
 type ProveTraitModalProps = {
@@ -364,6 +365,7 @@ function ReadyStep({
 }) {
   const [copiedNullifier, setCopiedNullifier] = useState(false);
   const [copiedProof, setCopiedProof] = useState(false);
+  const [exported, setExported] = useState(false);
 
   const handleCopyNullifier = () => {
     navigator.clipboard.writeText(nullifier).then(() => {
@@ -378,6 +380,21 @@ function ReadyStep({
       setCopiedProof(true);
       setTimeout(() => setCopiedProof(false), 2000);
     });
+  };
+
+  const handleExport = () => {
+    if (!proof) return;
+    const portable = createPortableProof({
+      proof: proof.proof,
+      publicSignals: proof.publicSignals,
+      circuitVersion: "v1",
+      nullifier: proof.nullifier,
+      attestationId: proof.attestationId,
+      externalNullifier: proof.publicSignals?.[4],
+    });
+    exportProofToFile(portable);
+    setExported(true);
+    setTimeout(() => setExported(false), 2000);
   };
 
   return (
@@ -409,13 +426,22 @@ function ReadyStep({
 
       <div className="rounded-xl bg-ink-950/40 border border-ink-700 p-3 mb-4 text-left">
         <div className="text-[10px] text-mist/70 mb-2">Proof payload</div>
-        <button
-          type="button"
-          onClick={handleCopyProof}
-          className="w-full px-3 py-2 rounded-xl text-xs font-medium text-mist border border-ink-600 bg-ink-950/30 hover:border-white/30 hover:text-white transition-colors"
-        >
-          {copiedProof ? "Copied proof JSON" : "Copy Proof JSON"}
-        </button>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={handleCopyProof}
+            className="flex-1 px-3 py-2 rounded-xl text-xs font-medium text-mist border border-ink-600 bg-ink-950/30 hover:border-white/30 hover:text-white transition-colors"
+          >
+            {copiedProof ? "Copied proof JSON" : "Copy Proof JSON"}
+          </button>
+          <button
+            type="button"
+            onClick={handleExport}
+            className="flex-1 px-3 py-2 rounded-xl text-xs font-medium text-mist border border-ink-600 bg-ink-950/30 hover:border-white/30 hover:text-white transition-colors"
+          >
+            {exported ? "Exported!" : "Export as File"}
+          </button>
+        </div>
       </div>
 
       <div className="flex gap-3">

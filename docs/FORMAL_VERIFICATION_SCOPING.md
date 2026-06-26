@@ -80,6 +80,7 @@ The contract uses Stellar's native BN254 host functions (`bn254.g1_add`, `bn254.
 | **Rust integer overflow** | The `field_negate` function uses `overflowing_sub`. | Fuzz testing of `field_negate` with edge cases (0, 1, q-1, q). |
 | **Soroban budget exhaustion** | The verifier could be called with large inputs that exceed the ledger budget. | Budget simulation tests in `verify_proof` footprint tests. |
 | **Replay attacks across networks** | The verifier does not include `chain_id` in public signals. | This is a protocol-level concern, not a verifier bug. |
+| **Groth16 proof malleability** | An adversary with a valid proof can malleate `proof_a` to produce a different valid proof for the same public signals (Groth16's `simulation` property). This does not break soundness — no false statements can be proven. | Nullifier-based replay protection in `ReputationVerifier` (marks nullifiers as spent); BN254 G1 is prime-order so no small-subgroup malleation applies. |
 
 ---
 

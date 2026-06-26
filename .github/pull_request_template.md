@@ -26,6 +26,7 @@
 - [ ] No secrets, `.env`, or build artifacts committed
 - [ ] Tests added/updated (no tests deleted or weakened without justification below)
 - [ ] If contracts/scanner/circuits changed: WASM/artifact hashes + manifests updated
+- [ ] If circuits changed: constraint thresholds in `circuits/constraint-thresholds.json` verified and updated if needed
 - [ ] If event ABI / storage layout changed: scanner updated and version bumped
 - [ ] Docs / README updated if commands or behavior changed
 
