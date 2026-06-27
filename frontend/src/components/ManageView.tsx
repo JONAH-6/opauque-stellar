@@ -10,7 +10,7 @@
  *   - Paginated lists (10 per page)
  */
 
-import { useEffect, useMemo, useState, useCallback, useId } from "react";
+import { useEffect, useMemo, useState, useCallback, useId, useRef } from "react";
 import { useWallet } from "../hooks/useWallet";
 import { useSchemaStore } from "../store/schemaStore";
 import type { SchemaV2 } from "../lib/schema";
@@ -21,6 +21,8 @@ import {
   invokeDeprecateSchema,
   invokeRemoveDelegate,
   invokeRevokeAttestation,
+  fetchIssuedAttestations,
+  fetchAllSchemas,
 } from "../lib/programs";
 import type { Tab } from "./Layout";
 import { ModalShell } from "./ModalShell";
@@ -186,14 +188,14 @@ function SchemaCard({ schema, walletAddress, signTransaction, onAction, onDeprec
     }
     setBusy("Add delegate");
     try {
-      await invokeAddDelegate({
+      const txHash = await invokeAddDelegate({
         authority: walletAddress,
         schemaId: schemaIdBytes,
         delegate: addr,
         signTransaction,
       });
       setDelegateInput("");
-      onAction(`Delegate ${addr.slice(0, 6)}… added`);
+      onAction(`Delegate ${addr.slice(0, 6)}… added. Tx: ${txHash.slice(0, 10)}…${txHash.slice(-6)}`);
       onRefresh();
     } catch (e) {
       onAction(e instanceof Error ? e.message : "Add delegate failed", true);
@@ -209,13 +211,13 @@ function SchemaCard({ schema, walletAddress, signTransaction, onAction, onDeprec
     }
     setBusy("Remove delegate");
     try {
-      await invokeRemoveDelegate({
+      const txHash = await invokeRemoveDelegate({
         authority: walletAddress,
         schemaId: schemaIdBytes,
         delegate: delegateAddr,
         signTransaction,
       });
-      onAction(`Delegate ${delegateAddr.slice(0, 6)}… removed`);
+      onAction(`Delegate ${delegateAddr.slice(0, 6)}… removed. Tx: ${txHash.slice(0, 10)}…${txHash.slice(-6)}`);
       onRefresh();
     } catch (e) {
       onAction(e instanceof Error ? e.message : "Remove delegate failed", true);
@@ -495,6 +497,7 @@ export function ManageView({ onNavigate, readOnly = false }: ManageViewProps = {
   const schemaMap = useSchemaStore((s) => s.schemas);
   const addSchema = useSchemaStore((s) => s.addSchema);
   const markTraitInvalid = useSchemaStore((s) => s.markTraitInvalid);
+  const setIsFetchingSchemas = useSchemaStore((s) => s.setIsFetchingSchemas);
 
   const [attestations, setAttestations] = useState<ManagedAttestation[]>([]);
   const [loading, setLoading] = useState(false);
@@ -503,6 +506,7 @@ export function ManageView({ onNavigate, readOnly = false }: ManageViewProps = {
   const [recipientSearch, setRecipientSearch] = useState("");
   const [attestationPage, setAttestationPage] = useState(1);
   const [schemaPage, setSchemaPage] = useState(1);
+  const schemaSyncedRef = useRef(false);
 
   // Schemas this wallet has authority over — sorted newest first
   const mySchemas = useMemo(() => {
@@ -517,7 +521,7 @@ export function ManageView({ onNavigate, readOnly = false }: ManageViewProps = {
     setTimeout(() => setToast(null), 4000);
   }, []);
 
-  const handleSchemaDeprecated = useCallback((schema: SchemaV2) => {
+  const handleSchemaDeprecated = useCallback((schema: SchemaV2, _txHash: string) => {
     addSchema({ ...schema, deprecated: true });
   }, [addSchema]);
 
@@ -563,35 +567,83 @@ export function ManageView({ onNavigate, readOnly = false }: ManageViewProps = {
 
   const totalSchemaPages = Math.max(1, Math.ceil(mySchemas.length / ITEMS_PER_PAGE));
 
+  // Sync schemas from chain once per wallet session (#421)
+  useEffect(() => {
+    if (!walletAddress || schemaSyncedRef.current) return;
+    schemaSyncedRef.current = true;
+    setIsFetchingSchemas(true);
+    fetchAllSchemas(walletAddress)
+      .then((chainSchemas) => {
+        for (const s of chainSchemas) {
+          const schemaIdHex = "0x" + bytesToHex(s.schemaId);
+          const existing = useSchemaStore.getState().schemas[schemaIdHex];
+          if (!existing) {
+            addSchema({
+              address: "",
+              schemaId: schemaIdHex,
+              authority: s.authority,
+              resolver: "",
+              revocable: s.revocable,
+              name: s.name,
+              fieldDefinitions: s.fieldDefinitions,
+              version: 1,
+              delegates: s.delegates ?? [],
+              createdAt: 0,
+              schemaExpiryLedger: 0,
+              schemaExpirySlot: 0,
+              deprecated: s.deprecated,
+            });
+          } else if (s.deprecated && !existing.deprecated) {
+            addSchema({ ...existing, deprecated: true });
+          }
+        }
+      })
+      .catch(console.error)
+      .finally(() => setIsFetchingSchemas(false));
+  }, [walletAddress, addSchema, setIsFetchingSchemas]);
+
   const load = useCallback(async () => {
-    if (!publicKey) return;
+    if (!publicKey || !walletAddress) return;
     setLoading(true);
     try {
-      const [slot, schemaRows, attestationRows] = await Promise.all([
+      const [slot, chainAttestations] = await Promise.all([
         connection.getSlot(),
-        Promise.resolve(Object.values(schemaMap)),
-        Promise.resolve([] as ManagedAttestation[]),
+        fetchIssuedAttestations(walletAddress),
       ]);
 
-      // Build schema lookup for attestation labels
+      // Build schema lookup from current store for attestation labels
+      const schemaRows = Object.values(schemaMap);
       const schemaHexMap = new Map<string, { name: string; revocable: boolean; schemaPda: string }>();
       for (const s of schemaRows) {
         schemaHexMap.set(
           s.schemaId.replace(/^0x/, "").toLowerCase(),
-          { name: s.name, revocable: s.revocable, schemaPda: s.address }
+          { name: s.name, revocable: s.revocable, schemaPda: s.address },
         );
       }
 
       const slotBn = BigInt(slot);
-      const mine: ManagedAttestation[] = attestationRows
-        .map((attestation) => {
-          const sidHex = attestation.schemaIdHex.replace(/^0x/, "").toLowerCase();
+      const mine: ManagedAttestation[] = chainAttestations
+        .map((att) => {
+          const sidHex = att.schemaIdHex.toLowerCase();
           const schemaInfo = schemaHexMap.get(sidHex);
-          return { ...attestation, schemaName: schemaInfo?.name ?? attestation.schemaName };
+          return {
+            address: "",
+            uid: att.uid,
+            uidHex: att.uidHex,
+            schemaPda: schemaInfo?.schemaPda ?? "",
+            schemaId: att.schemaId,
+            schemaIdHex: att.schemaIdHex,
+            schemaName: schemaInfo?.name ?? "Unknown Schema",
+            stealthAddressHash: att.stealthAddressHash,
+            createdAt: att.createdAt,
+            expirationSlot: att.expirationSlot,
+            revocationSlot: att.revocationSlot,
+            isRevoked: att.isRevoked,
+            isExpired: att.expirationSlot > 0n && att.expirationSlot < slotBn,
+            isRevocable: schemaInfo?.revocable ?? false,
+          };
         })
-        .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1)); // newest first
-
-      void slotBn;
+        .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
 
       setAttestations(mine);
     } catch (e) {
@@ -599,7 +651,7 @@ export function ManageView({ onNavigate, readOnly = false }: ManageViewProps = {
     } finally {
       setLoading(false);
     }
-  }, [publicKey, connection, schemaMap, showToast]);
+  }, [publicKey, walletAddress, connection, schemaMap, showToast]);
 
   useEffect(() => {
     void load();

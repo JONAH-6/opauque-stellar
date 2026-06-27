@@ -169,10 +169,16 @@ function TraitCard({
         <p className="text-xs text-mist/70 italic">Proof generation disabled on this deployment.</p>
       )}
       {trait.isV2 && trait.chainDiscoveryOnly && (
-        <p className="text-xs text-mist">
-          Proof generation needs a V2 announcement (metadata marker 0xB2) that carries the leaf
-          nonce. This attestation was found on-chain for a stealth address you own.
-        </p>
+        <div className="rounded-lg border border-neutral-500/20 bg-neutral-500/5 px-3 py-2 space-y-1">
+          <p className="text-xs font-medium text-neutral-400">Proof unavailable — announcement missing</p>
+          <p className="text-xs text-mist">
+            This attestation was found on-chain but lacks the V2 announcement (0xB2 metadata
+            marker) that carries the leaf nonce required by the ZK circuit. To enable proof
+            generation, ask the issuer to re-announce this attestation with a V2 announcement.
+            Once the announcement appears on-chain and you rescan, the "Generate ZK Proof"
+            button will become available.
+          </p>
+        </div>
       )}
     </div>
   );

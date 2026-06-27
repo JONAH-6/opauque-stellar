@@ -10,6 +10,7 @@ import {
   nativeToScVal,
   scValToNative,
   StrKey,
+  xdr,
 } from "@stellar/stellar-sdk";
 import { deployedAddresses } from "../contracts/deployedAddresses";
 import { bytesToScVal, getSorobanServer, invokeContractMethod } from "./stellar";
@@ -347,19 +348,283 @@ function assertNotMainnet(fnName: string): void {
   }
 }
 
-export async function fetchAllSchemas(): Promise<ParsedSchemaPDA[]> {
-  assertNotMainnet("fetchAllSchemas");
-  return [];
+// =============================================================================
+// Event parsing helpers (shared by fetchAllSchemas / fetchIssuedAttestations)
+// =============================================================================
+
+function evScValToNative(val: unknown): unknown {
+  if (!val) return null;
+  try {
+    // SDK v13 returns pre-decoded xdr.ScVal objects
+    return scValToNative(val as xdr.ScVal);
+  } catch {
+    // Fallback: base64 string
+    if (typeof val === "string") {
+      try {
+        return scValToNative(xdr.ScVal.fromXDR(val, "base64"));
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  }
+}
+
+function evBufToU8(val: unknown): Uint8Array | null {
+  if (val instanceof Buffer) return new Uint8Array(val);
+  if (val instanceof Uint8Array) return val;
+  return null;
+}
+
+function evU8ToHex(bytes: Uint8Array): string {
+  return Array.from(bytes)
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+// =============================================================================
+// On-chain attestation fetch (for ManageView — attestations the wallet issued)
+// =============================================================================
+
+export interface IssuedAttestationEvent {
+  uid: Uint8Array;
+  uidHex: string;
+  schemaId: Uint8Array;
+  schemaIdHex: string;
+  stealthAddressHash: Uint8Array;
+  createdAt: bigint;
+  expirationSlot: bigint;
+  revocationSlot: bigint;
+  isRevoked: boolean;
+  txHash: string;
+}
+
+export async function fetchIssuedAttestations(
+  issuer: string,
+  startLedger = 1,
+): Promise<IssuedAttestationEvent[]> {
+  if (getNetwork() === "mainnet") return [];
+  try {
+    const server = getSorobanServer();
+    const eventsRes = await server.getEvents({
+      startLedger: Math.max(1, startLedger),
+      filters: [
+        { type: "contract", contractIds: [ATTESTATION_ENGINE_V2_CONTRACT_ID] },
+      ],
+      limit: 500,
+    });
+
+    const attestMap = new Map<string, IssuedAttestationEvent>();
+    const revokeMap = new Map<string, bigint>();
+
+    for (const ev of eventsRes.events) {
+      if (!ev.inSuccessfulContractCall) continue;
+      const topics = ev.topic as unknown[];
+      if (!topics?.length) continue;
+      const evName = evScValToNative(topics[0]);
+      if (typeof evName !== "string") continue;
+      const data = evScValToNative(ev.value as unknown);
+
+      if (evName === "AttestationCreated" || evName === "attest") {
+        let uid: Uint8Array | null = null;
+        let schemaId: Uint8Array | null = null;
+        let evIssuer = "";
+        let stealthAddressHash: Uint8Array | null = null;
+        let expirationSlot = 0n;
+        let createdAt = 0n;
+
+        if (Array.isArray(data)) {
+          // Tuple: [uid, schema_id, issuer, stealth_address_hash, expiration_slot, created_at]
+          uid = evBufToU8(data[0]);
+          schemaId = evBufToU8(data[1]);
+          evIssuer = typeof data[2] === "string" ? data[2] : String(data[2] ?? "");
+          stealthAddressHash = evBufToU8(data[3]);
+          expirationSlot = typeof data[4] === "bigint" ? data[4] : 0n;
+          createdAt = typeof data[5] === "bigint" ? data[5] : 0n;
+        } else if (data && typeof data === "object") {
+          const d = data as Record<string, unknown>;
+          uid = evBufToU8(d.uid);
+          schemaId = evBufToU8(d.schema_id);
+          evIssuer = typeof d.issuer === "string" ? d.issuer : String(d.issuer ?? "");
+          stealthAddressHash = evBufToU8(d.stealth_address_hash);
+          expirationSlot = typeof d.expiration_slot === "bigint" ? d.expiration_slot : 0n;
+          createdAt = typeof d.created_at === "bigint" ? d.created_at : 0n;
+        }
+
+        if (!uid || evIssuer !== issuer) continue;
+
+        const uidHex = evU8ToHex(uid);
+        attestMap.set(uidHex, {
+          uid,
+          uidHex,
+          schemaId: schemaId ?? new Uint8Array(32),
+          schemaIdHex: schemaId ? evU8ToHex(schemaId) : "",
+          stealthAddressHash: stealthAddressHash ?? new Uint8Array(32),
+          createdAt,
+          expirationSlot,
+          revocationSlot: 0n,
+          isRevoked: false,
+          txHash: ev.txHash ?? "",
+        });
+      } else if (evName === "AttestationRevoked" || evName === "revoke") {
+        let uid: Uint8Array | null = null;
+        let revocationSlot = 0n;
+
+        if (Array.isArray(data)) {
+          // Tuple: [uid, schema_id, issuer, revocation_slot]
+          uid = evBufToU8(data[0]);
+          revocationSlot = typeof data[3] === "bigint" ? data[3] : 0n;
+        } else if (data && typeof data === "object") {
+          const d = data as Record<string, unknown>;
+          uid = evBufToU8(d.uid);
+          revocationSlot = typeof d.revocation_slot === "bigint" ? d.revocation_slot : 0n;
+        }
+
+        if (!uid) continue;
+        revokeMap.set(evU8ToHex(uid), revocationSlot > 0n ? revocationSlot : 1n);
+      }
+    }
+
+    return Array.from(attestMap.values()).map((att) => {
+      const revSlot = revokeMap.get(att.uidHex);
+      return {
+        ...att,
+        isRevoked: revSlot !== undefined,
+        revocationSlot: revSlot ?? 0n,
+      };
+    });
+  } catch {
+    return [];
+  }
+}
+
+export async function fetchAllSchemas(authority?: string): Promise<ParsedSchemaPDA[]> {
+  if (getNetwork() === "mainnet") return [];
+  try {
+    const server = getSorobanServer();
+    const eventsRes = await server.getEvents({
+      startLedger: 1,
+      filters: [
+        { type: "contract", contractIds: [SCHEMA_REGISTRY_CONTRACT_ID] },
+      ],
+      limit: 500,
+    });
+
+    const schemaMap = new Map<string, ParsedSchemaPDA & { _idBytes: Uint8Array }>();
+    const deprecatedIds = new Set<string>();
+    const delegatesAdded = new Map<string, Set<string>>();
+    const delegatesRemoved = new Map<string, Set<string>>();
+
+    for (const ev of eventsRes.events) {
+      if (!ev.inSuccessfulContractCall) continue;
+      const topics = ev.topic as unknown[];
+      if (!topics?.length) continue;
+      const evName = evScValToNative(topics[0]);
+      if (typeof evName !== "string") continue;
+      const data = evScValToNative(ev.value as unknown);
+
+      if (evName === "SchemaRegistered") {
+        let schemaId: Uint8Array | null = null;
+        let evAuthority = "";
+        let name = "";
+        let fieldDefinitions = "";
+        let revocable = false;
+
+        if (Array.isArray(data)) {
+          // Tuple: [schema_id, authority, name, field_definitions, revocable]
+          schemaId = evBufToU8(data[0]);
+          evAuthority = typeof data[1] === "string" ? data[1] : String(data[1] ?? "");
+          name = typeof data[2] === "string" ? data[2] : "";
+          fieldDefinitions = typeof data[3] === "string" ? data[3] : "";
+          revocable = Boolean(data[4]);
+        } else if (data && typeof data === "object") {
+          const d = data as Record<string, unknown>;
+          schemaId = evBufToU8(d.schema_id);
+          evAuthority = typeof d.authority === "string" ? d.authority : String(d.authority ?? "");
+          name = typeof d.name === "string" ? d.name : "";
+          fieldDefinitions = typeof d.field_definitions === "string" ? d.field_definitions : "";
+          revocable = Boolean(d.revocable);
+        }
+
+        if (!schemaId) continue;
+        if (authority && evAuthority !== authority) continue;
+
+        const hex = evU8ToHex(schemaId);
+        schemaMap.set(hex, {
+          schemaId,
+          _idBytes: schemaId,
+          authority: evAuthority,
+          revocable,
+          name,
+          fieldDefinitions,
+          deprecated: false,
+          delegates: [],
+        });
+      } else if (evName === "SchemaDeprecated") {
+        let schemaId: Uint8Array | null = null;
+        if (Array.isArray(data)) {
+          schemaId = evBufToU8(data[0]);
+        } else if (data && typeof data === "object") {
+          schemaId = evBufToU8((data as Record<string, unknown>).schema_id);
+        }
+        if (schemaId) deprecatedIds.add(evU8ToHex(schemaId));
+      } else if (evName === "DelegateAdded") {
+        let schemaId: Uint8Array | null = null;
+        let delegate = "";
+        if (Array.isArray(data)) {
+          schemaId = evBufToU8(data[0]);
+          delegate = typeof data[1] === "string" ? data[1] : "";
+        } else if (data && typeof data === "object") {
+          const d = data as Record<string, unknown>;
+          schemaId = evBufToU8(d.schema_id);
+          delegate = typeof d.delegate === "string" ? d.delegate : "";
+        }
+        if (schemaId && delegate) {
+          const hex = evU8ToHex(schemaId);
+          if (!delegatesAdded.has(hex)) delegatesAdded.set(hex, new Set());
+          delegatesAdded.get(hex)!.add(delegate);
+        }
+      } else if (evName === "DelegateRemoved") {
+        let schemaId: Uint8Array | null = null;
+        let delegate = "";
+        if (Array.isArray(data)) {
+          schemaId = evBufToU8(data[0]);
+          delegate = typeof data[1] === "string" ? data[1] : "";
+        } else if (data && typeof data === "object") {
+          const d = data as Record<string, unknown>;
+          schemaId = evBufToU8(d.schema_id);
+          delegate = typeof d.delegate === "string" ? d.delegate : "";
+        }
+        if (schemaId && delegate) {
+          const hex = evU8ToHex(schemaId);
+          if (!delegatesRemoved.has(hex)) delegatesRemoved.set(hex, new Set());
+          delegatesRemoved.get(hex)!.add(delegate);
+        }
+      }
+    }
+
+    return Array.from(schemaMap.values()).map((s) => {
+      const hex = evU8ToHex(s._idBytes);
+      const added = delegatesAdded.get(hex) ?? new Set<string>();
+      const removed = delegatesRemoved.get(hex) ?? new Set<string>();
+      const delegates = Array.from(added).filter((d) => !removed.has(d));
+      return {
+        schemaId: s._idBytes,
+        authority: s.authority,
+        revocable: s.revocable,
+        name: s.name,
+        fieldDefinitions: s.fieldDefinitions,
+        deprecated: deprecatedIds.has(hex),
+        delegates,
+      };
+    });
+  } catch {
+    return [];
+  }
 }
 
 export async function fetchAllAttestations(): Promise<unknown[]> {
-  assertNotMainnet("fetchAllAttestations");
   return [];
-}
-
-export async function fetchAttestationPDA(): Promise<string> {
-  assertNotMainnet("fetchAttestationPDA");
-  return "";
 }
 
 export interface ParsedSchemaPDA {
@@ -369,6 +634,7 @@ export interface ParsedSchemaPDA {
   name: string;
   fieldDefinitions: string;
   deprecated: boolean;
+  delegates?: string[];
 }
 
 /** A single entry from the reputation verifier root history. */

@@ -78,6 +78,7 @@ export function SchemaStudio() {
   const schemaManagementEnabled = getFeatureFlags().schemaManagement;
   const { address: walletAddress, publicKey, signTransaction } = useWallet();
   const addSchema = useSchemaStore((s) => s.addSchema);
+  const isFetchingSchemas = useSchemaStore((s) => s.isFetchingSchemas);
 
   const [name, setName] = useState("");
   const [fields, setFields] = useState<FieldDef[]>([
@@ -259,6 +260,12 @@ export function SchemaStudio() {
           Define the template for a class of attestations and control who can
           issue them.
         </p>
+        {isFetchingSchemas && (
+          <p className="flex items-center gap-1.5 text-xs text-mist mt-1">
+            <span className="h-3 w-3 animate-spin rounded-full border border-ink-600 border-t-white" />
+            Syncing schemas from chain…
+          </p>
+        )}
       </div>
 
       {/* Schema Name */}

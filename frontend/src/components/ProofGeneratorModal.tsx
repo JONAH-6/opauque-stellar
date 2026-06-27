@@ -91,6 +91,15 @@ export function ProofGeneratorModal({ trait, onClose }: ProofGeneratorModalProps
   }, []);
 
   const handleGenerate = async () => {
+    if (trait.chainDiscoveryOnly) {
+      setError(
+        "Proof generation is unavailable for this attestation. It was discovered on-chain " +
+          "without a V2 announcement (0xB2 metadata marker), which is required to obtain the " +
+          "leaf nonce for the ZK circuit. Ask the issuer to re-announce the attestation, then rescan."
+      );
+      setStep("error");
+      return;
+    }
     if (!externalNullifier.trim()) {
       setError("External nullifier is required.");
       return;
